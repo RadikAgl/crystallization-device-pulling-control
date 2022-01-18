@@ -24,9 +24,9 @@ byte eeprom_data[] = {10, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 
 int calibration_coeff, current_calibration;
 double value_for_print; 
 
-byte i = 1, mode = 0,j_step = 1, point = 10, cur_item = 0, number_of_steps = 0;
+byte i = 1, mode = 0, j_step = 1, point = 10, cur_item = 0, number_of_steps = 0;
 
-int timer_handler_counter=0, c, incremental_var = 0, current_var = 10, interrupt_pause; 
+int timer_handler_counter = 0, incremental_var = 0, current_var = 10, interrupt_pause; 
 
 int pulling_speeds[10], pulling_lengths[10];
 
@@ -61,6 +61,7 @@ void setup() {
    EEPROM.get(22, calibration_coeff);
    current_calibration = calibration_coeff;
    current_var = eeprom_data[0];
+   incremental_var = current_var;
    const int eeprom_data_length = sizeof(eeprom_data) / sizeof(eeprom_data[0]);
    
    Timer1.initialize(1000);            // initialize timer 1
@@ -78,11 +79,11 @@ void loop() {
   if(is_pulling_allowed()) { // when pulling is proccessing 
     enabled(); // step driver moving enabled
       
-    if(number_of_steps == 0) { // if is mode "Multi" - start_of_block
-      timer_interrupt_permission = true; // permission to execute the handler body 
+    if(number_of_steps == 0) { // if is mode "Mono" - start_of_block
+      timer_interrupt_permission = true; // permission to execute the timer interrupt handler 
       speed_to_impulses(current_var);
       
-      while(1) {  // while the mono pulling - start of block
+      while(true) {  // while the mono pulling - start of block
         //dirDOWN();
         
         lcd.clear();
@@ -111,7 +112,7 @@ void loop() {
       
       start_time = millis();          // time when current step is beginning
       
-      while(1) {  // while the multi pulling - start of block
+      while(true) {  // while the multi pulling - start of block
         dirDOWN();
         
         t = (long)(millis() - start_time)/1000; // time elapsed from the beginning of the current step 
@@ -183,7 +184,7 @@ void loop() {
       point = 10;
       is_menu_active = false;
 
-      while(1) {  // circular while choosing pulling mode - start of block
+      while(true) {  // circular while choosing pulling mode - start of block
         
         circular_listing(0, 1); // circular listing of mode list
         lcd.clear();
@@ -205,11 +206,11 @@ void loop() {
         
         is_speed_set = true;
         is_multi_mode_settings = true;
+        is_need_to_set_number_of_steps = true;
         
         while(is_need_to_set_number_of_steps) { // set the number of steps - start of block
           delay(100);
           lcd.clear();
-          lcd.setCursor(0,0);
           if (incremental_var == -1) {
             lcd.print("Set def params");
             }
@@ -222,25 +223,26 @@ void loop() {
           if(is_button_pressed) {
             is_need_to_set_number_of_steps = false;
             is_button_pressed = false;
-            if (incremental_var == -1) set_default_multi_parameters();
+            if (incremental_var == -1) {
+              set_default_multi_parameters();
+              cur_item = number_of_steps;
+            }
             else {
-            number_of_steps = incremental_var;
+              number_of_steps = incremental_var;
+              cur_item = 0;
             }
             incremental_var = 1;
           }
           
         } // set the number of steps - end of block
-        
-        cur_item = 0;
+       
         while(cur_item < number_of_steps) {  // set speed and length for all steps - start of block
           if(is_speed_set) { // set pulling speed of current step - start of block
             
             limit_listing(0, 200); // limit value
             lcd.clear();
-            lcd.print("v[");
-            lcd.print(cur_item + 1);
-            lcd.print("] = ");
-            lcd.print(to_double(incremental_var)); 
+            value_for_print = to_double(incremental_var);
+            print_array_element("v", cur_item + 1, value_for_print); 
             delay(100);
             
             if(is_button_pressed){ // set pulling speed for i's step
@@ -257,10 +259,8 @@ void loop() {
             limit_listing(0, 200); // limit value
             delay(100);
             lcd.clear();
-            lcd.print("d[");
-            lcd.print(cur_item + 1);
-            lcd.print("] = ");
-            lcd.print(to_double(incremental_var)); 
+            value_for_print = to_double(incremental_var);
+            print_array_element("d", cur_item + 1, value_for_print); 
             
             
             if(is_button_pressed){
@@ -284,21 +284,16 @@ void loop() {
       point = 10;
       while(true){ // preset parameters of multi mode - start of block
         delay(100);
+        
         lcd.clear();
-        lcd.print("v[");
-        lcd.print(incremental_var);
-        lcd.print("] = ");
         value_for_print = to_double(pulling_speeds[incremental_var]);
-        lcd.print(value_for_print);
+        print_array_element("v", incremental_var, value_for_print);
+        
         lcd.setCursor(0,1);
-        lcd.print("d[");
-        lcd.print(incremental_var);
-        lcd.print("] = ");
         value_for_print = to_double(pulling_lengths[incremental_var]);
-        lcd.print(value_for_print); 
+        print_array_element("d", incremental_var, value_for_print);
 
-
-       limit_listing(0, number_of_steps); // limit value
+        circular_listing(0, number_of_steps); // limit value
        
         if(is_button_pressed){
           is_button_pressed = false;
@@ -314,13 +309,12 @@ void loop() {
         point = 10;
         is_menu_active = false;
 
-        while(1) {  // circular while choosing default mode - start of block
+        while(true) {  // circular while choosing default mode - start of block
           
           circular_listing(0, 4); // circular listing of mode list 
           delay(100);
           lcd.clear();
           lcd.print(mode_points[incremental_var]); // modes list
-;
   
           if(is_button_pressed){ // if button pressed, choose current mode
            is_button_pressed = false; 
@@ -333,7 +327,7 @@ void loop() {
         if (mode == 0) { // set default mono mode speed
           mode = 10;
           incremental_var = eeprom_data[0];
-          while(1) {
+          while(true) {
             delay(100);
             lcd.clear(); 
             lcd.print("v = ");
@@ -385,16 +379,12 @@ void loop() {
               limit_listing(0, 200); // limit value
               
               lcd.clear();
-              lcd.setCursor(0,0);
-              lcd.print("v[");
-              lcd.print(cur_item + 1);
-              lcd.print("] = ");
-              lcd.print(to_double(incremental_var)); 
+              value_for_print = to_double(incremental_var);
+              print_array_element("v", cur_item + 1, value_for_print); 
               delay(100);
               
               if(is_button_pressed){ // set pulling speed for i's step
                 eeprom_data[2*cur_item+2] = incremental_var;
-                Serial.print(eeprom_data[2*cur_item+2]);
                 incremental_var = 1;
                 is_button_pressed = false;
                 is_speed_set = false;
@@ -407,12 +397,10 @@ void loop() {
               limit_listing(0, 200); // limit value
               
               lcd.clear();
-              lcd.setCursor(0,0);
-              lcd.print("d[");
-              lcd.print(cur_item + 1);
-              lcd.print("] = ");
-              lcd.print(to_double(incremental_var)); 
+              value_for_print = to_double(incremental_var);
+              print_array_element("d", cur_item + 1, value_for_print); 
               delay(100);
+
               
               if(is_button_pressed){
                 eeprom_data[2*cur_item+3] = incremental_var; // set pulling length for i's step
@@ -432,9 +420,9 @@ void loop() {
 
         if (mode == 2) { // set default calibration coefficient
           mode = 10;
-          //incremental_var = eeprom_data[21];
+
           incremental_var = calibration_coeff;
-          while(1) {
+          while(true) {
             delay(100);
             lcd.clear(); 
             lcd.print("Cal = ");
@@ -456,7 +444,7 @@ void loop() {
         if (mode == 3) { // show current default params
           mode = 10;
           incremental_var = 0;
-          while(1) {
+          while(true) {
             delay(100);
             lcd.clear(); 
             if (incremental_var == 0) {
@@ -471,17 +459,12 @@ void loop() {
               {
                 if (eeprom_data[1]> 0) {
                   lcd.clear();
-                  lcd.print("v[");
-                  lcd.print(incremental_var - 1);
-                  lcd.print("] = ");
                   value_for_print = to_double(eeprom_data[2 * incremental_var - 2]);
-                  lcd.print(value_for_print);
+                  print_array_element("v", incremental_var - 1, value_for_print);                  
+
                   lcd.setCursor(0,1);
-                  lcd.print("d[");
-                  lcd.print(incremental_var - 1);
-                  lcd.print("] = ");
                   value_for_print = to_double(eeprom_data[2 * incremental_var -1]);
-                  lcd.print(value_for_print); 
+                  print_array_element("d", incremental_var - 1, value_for_print);
                   delay(100);
                 }
                 else {
@@ -495,7 +478,6 @@ void loop() {
               {
               lcd.print("defCal = ");
               lcd.print(calibration_coeff);
-              Serial.println(calibration_coeff);
               }
 
               circular_listing(0, eeprom_data[1] + 3);
@@ -652,9 +634,18 @@ void limit_listing(int first, int last)
     }
     
 void lcd_initialize() {
-        if(lcd_initialize_counter > 300000) {
-          LiquidCrystal lcd(rs, en, d4, d5, d6, d7);  
-          lcd.begin(16, 2); 
-          lcd_initialize_counter = 0;
-          }
-        }
+  if(lcd_initialize_counter > 300000) {
+    delay(100);
+    LiquidCrystal lcd(rs, en, d4, d5, d6, d7);  
+    lcd.begin(16, 2); 
+    lcd_initialize_counter = 0;
+    }
+  }
+        
+void print_array_element(char type[], int idx, double value) { 
+  lcd.print(type);
+  lcd.print("[");
+  lcd.print(idx);
+  lcd.print("] = ");
+  lcd.print(value);  
+  }
