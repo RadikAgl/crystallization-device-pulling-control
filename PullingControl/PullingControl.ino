@@ -67,7 +67,7 @@ void setup() {
    Timer1.initialize(1000);            // initialize timer 1
    Timer1.attachInterrupt(timer_interrupt_handler);        // set handler for timer interrupt - timer_interrupt_handler 
    
-   // Initialize external interrupts, handlers: encoder and button
+   // Initialize external interrupts, handlers: encoder(increment and decrement) and button
    attachInterrupt(0, encoder, FALLING);
    attachInterrupt(1, button, FALLING);    
 
@@ -239,7 +239,7 @@ void loop() {
         while(cur_item < number_of_steps) {  // set speed and length for all steps - start of block
           if(is_speed_set) { // set pulling speed of current step - start of block
             
-            limit_listing(0, 200); // limit value
+            limit_listing(1, 200); // limit value
             lcd.clear();
             value_for_print = to_double(incremental_var);
             print_array_element("v", cur_item + 1, value_for_print); 
@@ -256,7 +256,7 @@ void loop() {
           
           else { // set pulling length of current step - start of block
             
-            limit_listing(0, 200); // limit value
+            limit_listing(1, 200); // limit value
             delay(100);
             lcd.clear();
             value_for_print = to_double(incremental_var);
@@ -376,7 +376,7 @@ void loop() {
           while(cur_item < eeprom_data[1]) {  // set speed and length for all steps - start of block
             if(is_speed_set) { // set default pulling speed of current step - start of block
               
-              limit_listing(0, 200); // limit value
+              limit_listing(1, 200); // limit value
               
               lcd.clear();
               value_for_print = to_double(incremental_var);
@@ -394,7 +394,7 @@ void loop() {
             
             else { // set default pulling length of current step - start of block
               
-              limit_listing(0, 200); // limit value
+              limit_listing(1, 200); // limit value
               
               lcd.clear();
               value_for_print = to_double(incremental_var);
@@ -480,7 +480,7 @@ void loop() {
               lcd.print(calibration_coeff);
               }
 
-              circular_listing(0, eeprom_data[1] + 3);
+              circular_listing(0, eeprom_data[1] + 2);  // sum of multi, mono and calibration coeff
            
               if(is_button_pressed) { // if button pressed set defaul mono mode speed
                 is_button_pressed = false;
@@ -494,7 +494,7 @@ void loop() {
             
        } // default parameters - end of block
 //////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////////
-      if(point == 0) { // exit to desktop
+      if(point == 0) { // exit to main
         is_menu_active = false;
         point = 10;
         incremental_var = 1;
@@ -510,22 +510,22 @@ void loop() {
     lcd.print(" mm/h ");
     lcd.setCursor(4, 1);
     
-    if( incremental_var == -1) {
+    if( incremental_var == 0) {
       lcd.print("Menu");
     }
     else {
       lcd.print(to_double(incremental_var));
     }
     
-    limit_listing(-1, 200);
+    limit_listing(0, 200);
     
     lcd.setCursor(9,1);
     lcd.print("NoPull");
     
     if(is_button_pressed) { // if button pressed chose cur_speed or go to menu
-      if (incremental_var < 0) {
+      if (incremental_var < 1) {
         is_menu_active = true;
-        incremental_var = 0;
+        incremental_var = 1;
       }
       else {
         current_var = incremental_var;
@@ -558,9 +558,12 @@ void encoder() {                           // interrupting on pin 2, decrement, 
      }
    }
   
-void button() {                   // interrupting on pin 2, button of encoder
+void button() {                   // interrupting on pin 3, button of encoder
   noInterrupts();
-  is_button_pressed = true;
+  delay(10);
+  if(digitalRead(BUT) == 0) {
+    is_button_pressed = true;
+    }
   interrupts();
   }
   
